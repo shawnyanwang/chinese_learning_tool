@@ -1,2 +1,1 @@
-# chinese_learning_tool
-A small tool to learn Chinese character
+This is a tool based on the google TTS and website "http://bishun.strokeorder.info/".

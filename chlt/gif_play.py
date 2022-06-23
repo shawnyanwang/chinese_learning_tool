@@ -19,8 +19,9 @@ class ImageLabel(tk.Label):
 
         try:
             self.delay = im.info['duration']
+            self.delay = 200
         except:
-            self.delay = 10
+            self.delay = 1
 
         if len(self.frames) == 1:
             self.config(image=self.frames[0])
@@ -42,14 +43,15 @@ class ImageLabel(tk.Label):
             self.after_cancel(self._job)
             self._job = None
 
-def display_gif(path = './source/尽.gif'):
+def display_gif(path = './source/5b8b.gif'):
     root = tk.Toplevel()
-    root.geometry('300x300+50+50')
+    root.geometry('380x380+50+50')
     lbl = ImageLabel(root)
     lbl.pack()
     lbl.load(path)
     return root
-    # root.mainloop()
+
 
 if __name__ == "__main__":
-    display_gif()
+    root = display_gif()
+    root.mainloop()

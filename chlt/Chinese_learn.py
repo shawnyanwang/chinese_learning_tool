@@ -59,6 +59,12 @@ class download_chinese_gif_file_from_web:
             if self.is_valid(img_url):
                 urls.append(img_url)
         return urls
+    def make_filename(self,filename):
+        # if path doesn't exist, make that path dir
+        if not os.path.isdir(self.path):
+            os.makedirs(self.path)
+        filename = os.path.join(self.path, filename)
+        return filename
 
     def download(self,url, pathname,filename=''):
         """
@@ -72,43 +78,65 @@ class download_chinese_gif_file_from_web:
         # get the total file size
         file_size = int(response.headers.get("Content-Length", 0))
         # get the file name
+
         if filename=='':
             filename = os.path.join(pathname, url.split("/")[-1])
         else:
             filename = os.path.join(pathname, filename)
         # progress bar, changing the unit to bytes instead of iteration (default by tqdm)
-        progress = tqdm(response.iter_content(1024), f"Downloading {filename}", total=file_size, unit="B", unit_scale=True, unit_divisor=1024)
-        with open(filename, "wb") as f:
-            for data in progress.iterable:
-                # write data read to the file
-                f.write(data)
-                # update the progress bar manually
-                progress.update(len(data))
+            progress = tqdm(response.iter_content(1024), f"Downloading {filename}", total=file_size, unit="B", unit_scale=True, unit_divisor=1024)
+            with open(filename, "wb") as f:
+                for data in progress.iterable:
+                    # write data read to the file
+                    f.write(data)
+                    # update the progress bar manually
+                    progress.update(len(data))
+        return filename
+
     def main(self,ch_c):
         # get all images
-        url = self.url_head+ch_c
-        filename = ch_c+'.gif'
+        x = hex(ord(ch_c))
+        ch_c_UTF8 = x[2:]
+        filename = ch_c_UTF8+'.gif'
+        if 'bishun.strokeorder.info' in self.url_head:
+            ch_gif_fname = None
+            url = self.url_head+ch_c
+            imgs = self.get_all_images(url)
+            path = self.path
+            for img in imgs:
+                # for each image, download it
+                if '.gif' in img:
+                    ch_gif_fname = self.download(img, self.path,filename)
+            if not ch_gif_fname or not os.path.isfile(ch_gif_fname):
+                return False
+        elif 'strokeorder.com.tw' in self.url_head:
+            # url = 'https://strokeorder.com.tw/'+ch_c+'.html'
+            # url = 'https://strokeorder.com.tw/宋.html'
+            url = 'https://strokeorder.com.tw/bishun-animation/'+ch_c_UTF8+'-stroke-order.gif'
+            response = requests.get(url, stream=True)
+            if response.status_code != 404:
+                filename = self.make_filename(filename)
+                file = open(filename, "wb")
+                file.write(response.content)
+                file.close()
+            else:
+                return False
+        return True
         # print('this +96'+filename)
         # print('this +96'+self.path)
-        imgs = self.get_all_images(url)
-        path = self.path
-        for img in imgs:
-            # for each image, download it
-            if '.gif' in img:
-                print(img)
-                self.download(img, self.path,filename)
+
 
 class text_display_button(QGUI_widget):
-    def __init__(self,root,input_text = 'hao',path_name = '',button_size = 85):
+    def __init__(self,root,input_text = 'hao',path_name = '',button_size = 85,ST='autoS'):
         self.input_text = input_text
-        s =str(input_text[0].encode('utf-8'))
-        x = s.replace('\\','')
-        x = x.replace('\'','')
-        self.audio_file_coding = x
+        # s =str(input_text[0].encode('utf-8'))
+        x = hex(ord(input_text[0]))
+        self.text_UTF8= x[2:]
         self.path_name = path_name
         self.button_size = button_size
+        self.Tradition_or_Simple = ST
         QGUI_widget.__init__(self, root)
-        self.download_gif = download_chinese_gif_file_from_web(path=path_name)
+
 
 
         # print(self.widgets)
@@ -171,7 +199,7 @@ class text_display_button(QGUI_widget):
     def read(self):
         var = gTTS(text = self.input_text,lang = 'zh-cn')
         import os.path
-        audio_fname = os.path.join(self.path_name,self.audio_file_coding+'.mp3')
+        audio_fname = os.path.join(self.path_name,self.text_UTF8+'.mp3')
         # print(os.path.isfile(fname))
 
         if not os.path.isfile(audio_fname):
@@ -181,12 +209,23 @@ class text_display_button(QGUI_widget):
 
     def display_gif_file(self,display_pro = 'system'):
         # ch_gif_fname = self.path_name+self.input_text[0]+'.gif'
-        ch_gif_fname = os.path.join(self.path_name,self.input_text[0]+'.gif')
+        ch_gif_fname = os.path.join(self.path_name,self.text_UTF8+'.gif')
         if not os.path.isfile(ch_gif_fname):
             # print(self.input_text[0]+'.gif')
             # print(type(self.input_text[0]))
+            if self.Tradition_or_Simple == 'autoT':
+                url_head = u'https://strokeorder.com.tw/bishun-animation/'
+                self.download_gif = download_chinese_gif_file_from_web(path=self.path_name,url_head = url_head)
+                if not self.download_gif.main(self.input_text[0]):
+                    self.download_gif = download_chinese_gif_file_from_web(path=self.path_name)
+                    self.download_gif.main(self.input_text[0])
+            elif self.Tradition_or_Simple == 'autoS':
+                url_head = u'https://strokeorder.com.tw/bishun-animation/'
+                self.download_gif = download_chinese_gif_file_from_web(path=self.path_name)
+                if not self.download_gif.main(self.input_text[0]):
+                    self.download_gif = download_chinese_gif_file_from_web(path=self.path_name,url_head = url_head)
+                    self.download_gif.main(self.input_text[0])
 
-            self.download_gif.main(self.input_text[0])
         # display_gif(ch_gif_fname)
         if display_pro == 'system':
             os.system('TASKKILL /F /IM Microsoft.Photos.exe')
@@ -208,7 +247,7 @@ class text_display_button(QGUI_widget):
 
             self.gif_window = tk.Toplevel()
             gif_display_window = self.gif_window
-            self.gif_window.geometry('300x300+50+50')
+            self.gif_window.geometry('350x350+10+10')
 
             lbl = ImageLabel(self.gif_window)
             lbl.pack()
@@ -237,14 +276,28 @@ class main_frame():
         # self.gif_window.geometry('300x300+50+50')
         # global gif_display_window
         # gif_display_window = self.gif_window
+        self.Tradition_or_Simple = 'autoS'
         self.path_source = os.path.join(current_path, "source")
         self.button_object_list = []
         menu = Menu(self.root)
         self.root.config(menu=menu)
-        fileMenu = Menu(menu)
-        fileMenu.add_command(label="Open",command=self.load)
-        fileMenu.add_command(label="Exit", command=self.exitProgram)
+        fileMenu = Menu(menu,tearoff=False)
         menu.add_cascade(label="File", menu=fileMenu)
+        # fileMenu1  = fileMenu.add_command(label="Open",command=self.load)
+        fileMenu.add_command(label="Exit", command=self.exitProgram)
+
+        sub_menu = Menu(fileMenu, tearoff=0)
+        fileMenu.add_cascade(label="Open",menu=sub_menu)
+        sub_menu.add_command(label="简体为主",command=self.simple_)
+        sub_menu.add_command(label="繁体为主",command=self.tradition_)
+
+    def simple_(self):
+        self.Tradition_or_Simple = 'autoS'
+        self.load()
+    def tradition_(self):
+        self.Tradition_or_Simple = 'autoT'
+        self.load()
+
     def exitProgram(self):
         exit()
     def load(self):
@@ -296,7 +349,8 @@ class main_frame():
                     t = text_display_button(root = self.root,
                     input_text=self.input_text[j*cols+i],
                     button_size = button_size,
-                    path_name=self.path_source)
+                    path_name=self.path_source,
+                    ST = self.Tradition_or_Simple)
                     t.grid(row=j, column=i)
                     self.button_object_list.append(t)
                     n = n-1
